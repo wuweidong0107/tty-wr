@@ -60,6 +60,7 @@ static void handle_signal(int sig)
     (void)sig;
     printf("cleanup...\n");
     lockfile_remove();
+    exit(1);
 }
 
 int main(int argc, char **argv)
@@ -70,6 +71,8 @@ int main(int argc, char **argv)
     uint8_t tx_data[MAX_DATA_LENGTH];
     uint8_t rx_data[MAX_DATA_LENGTH];
     int i, len, ret;
+    int wait_timeout_ms = 10000;
+    bool first_byte = true;
 
     if (argc < 4) {
         help(argc, argv);
@@ -108,8 +111,15 @@ int main(int argc, char **argv)
     }
 
     while (1) {
-        if ((ret = serial_read(serial, rx_data, 1, 1000)) < 0) {
-            fprintf(stderr, "serial_read(): %s\n", serial_errmsg(serial));
+        if (first_byte == true) {
+            wait_timeout_ms = 3000;    // 3 second
+            first_byte = false;
+        } else {
+            wait_timeout_ms = 1;     // 1 second
+        }
+
+        if ((ret = serial_read(serial, rx_data, 1, wait_timeout_ms)) < 0) {
+            //fprintf(stderr, "serial_read(): %s\n", serial_errmsg(serial));
             exit(1);
         }
         if (ret > 0) {
