@@ -19,7 +19,8 @@ static void help(int argc, char **argv)
     fprintf(stderr, "Usage:\n");
     fprintf(stderr, "    %s <device> <baudrate> <byte1> <byte2> [...]\n\n", basename(argv[0]));
     fprintf(stderr, "Exmaple:\n");
-    fprintf(stderr, "    %s /dev/tty_mcu 115200 0b 55 aa 00 06 21 06 00 01 ff ff 20\n\n", basename(argv[0]));
+    fprintf(stderr, "    %s /dev/tty_mcu 115200 0b 55 aa 00 06 21 06 00 01 ff ff 20\n", basename(argv[0]));
+    fprintf(stderr, "    %s /dev/tty_bp1048 460800 06 55 AA 80 01 A1 20\n", basename(argv[0]));
 }
 
 static char lockfile[128];
@@ -102,12 +103,12 @@ int main(int argc, char **argv)
     serial = serial_new();
     if (serial_open(serial, device, baudrate) < 0) {
         fprintf(stderr, "serial_open(): %s\n", serial_errmsg(serial));
-        exit(1);
+        goto err2;
     }
 
     if (serial_write(serial, tx_data, len) < 0) {
         fprintf(stderr, "serial_write(): %s\n", serial_errmsg(serial));
-        exit(1);
+        goto err1;
     }
 
     while (1) {
@@ -115,12 +116,12 @@ int main(int argc, char **argv)
             wait_timeout_ms = 3000;    // 3 second
             first_byte = false;
         } else {
-            wait_timeout_ms = 1;     // 1 second
+            wait_timeout_ms = 1000;     // 1 second
         }
 
         if ((ret = serial_read(serial, rx_data, 1, wait_timeout_ms)) < 0) {
-            //fprintf(stderr, "serial_read(): %s\n", serial_errmsg(serial));
-            exit(1);
+            fprintf(stderr, "serial_read(): %s\n", serial_errmsg(serial));
+            goto err1;
         }
         if (ret > 0) {
             for (int i = 0; i < ret; i++)
@@ -134,8 +135,10 @@ int main(int argc, char **argv)
     }
     printf("\n");
 
+err1:
     serial_close(serial);
     serial_free(serial);
+err2:
     lockfile_remove();
     return 0;
 }
