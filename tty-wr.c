@@ -16,11 +16,16 @@
 static void help(int argc, char **argv)
 {
     (void)argc;
+    char *app = basename(argv[0]);
     fprintf(stderr, "Usage:\n");
-    fprintf(stderr, "    %s <device> <baudrate> <byte1> <byte2> [...]\n\n", basename(argv[0]));
+    fprintf(stderr, "    %s <device> <baudrate> <byte1> <byte2> [...]\n\n", app);
     fprintf(stderr, "Exmaple:\n");
-    fprintf(stderr, "    %s /dev/tty_mcu 115200 0b 55 aa 00 06 21 06 00 01 ff ff 20\n", basename(argv[0]));
-    fprintf(stderr, "    %s /dev/tty_bp1048 460800 06 55 AA 80 01 A1 20\n", basename(argv[0]));
+    fprintf(stderr, "    %s /dev/tty_mcu 115200                                         # monitor mode\n", app);
+    fprintf(stderr, "    %s /dev/tty_mcu 115200 0b 55 aa 00 06 21 06 00 01 ff ff 20\n", app);
+    fprintf(stderr, "    %s /dev/tty_58g 57600 55 aa 01 50 00 00                        # 58g read config\n", app);
+    fprintf(stderr, "    %s /dev/tty_58g 57600 55 aa 01 51 00 00                        # 58g read rf status\n", app);
+    fprintf(stderr, "    %s /dev/tty_bp1048 460800 06 55 AA 80 01 A1 20\n", app);  
+    fprintf(stderr, "    PROT=aimy %s /dev/tty_bp1048 460800 06 55 AA 80 01 A1 20\n", app);
 }
 
 static char lockfile[128];
@@ -59,7 +64,7 @@ static int lockfile_create(void)
 static void handle_signal(int sig)
 {
     (void)sig;
-    printf("cleanup...\n");
+    //printf("cleanup...\n");
     lockfile_remove();
     exit(1);
 }
@@ -74,8 +79,10 @@ int main(int argc, char **argv)
     int i, len, ret;
     int wait_timeout_ms = 10000;
     bool first_byte = true;
+    bool fist_byte_is_len = false;
+    char *prot=getenv("PROT");
 
-    if (argc < 4) {
+    if (argc < 3) {
         help(argc, argv);
         exit(1);
     }
@@ -90,6 +97,8 @@ int main(int argc, char **argv)
     if (lockfile_create() == -1) {
         exit(1);
     }
+
+    setbuf(stdout, NULL);
 
     /* install signal handler */
     struct sigaction handler;
@@ -106,17 +115,23 @@ int main(int argc, char **argv)
         goto err2;
     }
 
-    if (serial_write(serial, tx_data, len) < 0) {
-        fprintf(stderr, "serial_write(): %s\n", serial_errmsg(serial));
-        goto err1;
+    if (len > 0) {
+        if (serial_write(serial, tx_data, len) < 0) {
+            fprintf(stderr, "serial_write(): %s\n", serial_errmsg(serial));
+            goto err1;
+        }        
     }
 
+    if (prot != NULL && !strcmp(prot, "aimy")) {
+        fist_byte_is_len = true;
+    }
+
+    int rx_total=-1, rx_len=0;
     while (1) {
-        if (first_byte == true) {
-            wait_timeout_ms = 3000;    // 3 second
-            first_byte = false;
+        if (len == 0 ) {
+            wait_timeout_ms = -1;
         } else {
-            wait_timeout_ms = 1000;     // 1 second
+            wait_timeout_ms = 3000;
         }
 
         if ((ret = serial_read(serial, rx_data, 1, wait_timeout_ms)) < 0) {
@@ -124,12 +139,17 @@ int main(int argc, char **argv)
             goto err1;
         }
         if (ret > 0) {
-            for (int i = 0; i < ret; i++)
-            {
-                printf("%02x ", rx_data[i]);
+            if (first_byte == true && fist_byte_is_len == true) {
+                rx_total = rx_data[0]+1;
+                first_byte = false;
             }
+            for (int i = 0; i < ret; i++) {
+                printf("%02x ", rx_data[i]);
+                rx_len++;
+            }
+            if (rx_total != -1 && rx_len >= rx_total)
+                break;
         } else {
-            //printf("ret = %d\n", ret);
             break;
         }
     }
