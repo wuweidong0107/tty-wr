@@ -52,7 +52,7 @@ static int lockfile_create(void)
         snprintf(buf, sizeof(buf), "%10d\n", getpid());
         buf[sizeof(buf) - 1] = 0;
         if (write(fd, buf, strlen(buf)) < (ssize_t)strlen(buf)) {
-            fprintf(stderr, "fail to write lockfile %s: %s\n", lockfile, strerror(errno));
+            //fprintf(stderr, "fail to write lockfile %s: %s\n", lockfile, strerror(errno));
             return -1;
         }
         close(fd);
@@ -95,7 +95,8 @@ int main(int argc, char **argv)
 
     sprintf(lockfile, "/var/lock/%s.lock", basename(device));
     if (lockfile_create() == -1) {
-        exit(1);
+        lockfile[0] = 0;
+        //fprintf(stderr, "WARN: no lockfile\n");
     }
 
     setbuf(stdout, NULL);
