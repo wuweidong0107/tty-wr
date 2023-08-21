@@ -32,10 +32,12 @@ obj-y += serial.o
 all : 
 	make -C ./ -f $(TOPDIR)/Makefile.build
 	$(CC) -o $(TARGET) built-in.o $(LDFLAGS) -static
+	$(CC) checkcode.c -o checkcode -static
 
 clean:
 	@echo "cleaning..."
 	@rm -f $(shell find -type f -name "*.o")
 	@rm -f $(shell find -type f -name "*.d")
 	@rm -f $(TARGET)
+	@rm -f checkcode
 	
